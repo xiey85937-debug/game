@@ -1,0 +1,1298 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>脚本圈：更新与跑路</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 10px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f1115; color: #e6e6e6;
+    max-width: 560px; margin: 0 auto; padding-bottom: 40px;
+  }
+  h1 { font-size: 17px; margin: 4px 0 10px; text-align: center; color: #ffd479; }
+  .panel {
+    background: #1a1d24; border: 1px solid #2a2f3a;
+    border-radius: 10px; padding: 10px; margin-bottom: 10px;
+  }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .stat {
+    background: #12151b; border-radius: 8px; padding: 5px 3px;
+    text-align: center; font-size: 10px; color: #8892a4;
+  }
+  .stat .v { font-size: 14px; font-weight: 700; color: #7fd1ff; display: block; }
+  .stat.warn .v { color: #ff7b7b; }
+  .log {
+    height: 180px; overflow-y: auto; font-size: 12px; line-height: 1.55;
+    background: #12151b; border-radius: 8px; padding: 8px;
+  }
+  .log p { margin: 0 0 4px; }
+  .log .good { color: #7bff9e; }
+  .log .bad { color: #ff7b7b; }
+  .log .sys { color: #ffd479; }
+  .log .npc { color: #c9a0ff; }
+  button {
+    font-family: inherit; font-size: 12px; padding: 9px 6px;
+    border: none; border-radius: 8px; background: #2a3140; color: #e6e6e6;
+    margin: 3px 0; width: 100%; cursor: pointer;
+  }
+  button:active { background: #3a4255; }
+  button:disabled { opacity: .32; }
+  button.primary { background: #2b6cb0; }
+  button.primary:active { background: #3a7cc0; }
+  button.danger { background: #8b2b2b; }
+  button.danger:active { background: #a33; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .section-title { font-size: 11px; color: #8892a4; margin: 8px 0 4px; letter-spacing: 1px; }
+  .npc-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; padding: 4px 6px; background: #12151b;
+    border-radius: 6px; margin-bottom: 3px;
+  }
+  .npc-name { color: #c9a0ff; font-weight: 600; }
+  .npc-vals { color: #8892a4; font-size: 10px; }
+  .npc-vals b { color: #7fd1ff; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .tabs button { flex: 1; font-size: 11px; padding: 6px 2px; margin: 0; }
+  .tabs button.active { background: #2b6cb0; }
+  .hidden { display: none !important; }
+  .overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.92);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 999; overflow-y: auto;
+  }
+  .overlay .box {
+    background: #1a1d24; border: 1px solid #2a2f3a; border-radius: 12px;
+    padding: 20px; max-width: 400px; width: 100%; text-align: center;
+  }
+  .overlay h2 { font-size: 18px; margin: 0 0 12px; color: #ffd479; }
+  .overlay p { font-size: 13px; line-height: 1.7; color: #b8c0cc; }
+  .identity-btn {
+    width: 100%; margin: 4px 0; padding: 12px; font-size: 14px;
+    background: #2b6cb0; color: #fff; border: none; border-radius: 8px;
+    display: block;
+  }
+  input, textarea, select {
+    width: 100%; padding: 8px; margin: 4px 0;
+    background: #12151b; color: #e6e6e6;
+    border: 1px solid #2a2f3a; border-radius: 6px;
+    font-family: inherit; font-size: 13px;
+  }
+  .script-card {
+    background: #12151b; border-radius: 8px; padding: 8px; margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .script-card .name { color: #ffd479; font-weight: 700; font-size: 13px; }
+  .script-card .row { color: #8892a4; margin-top: 2px; }
+  .script-card .row b { color: #7fd1ff; }
+  .event-text {
+    font-size: 13px; line-height: 1.8; color: #e6e6e6;
+    text-align: left; margin: 10px 0;
+    background: #12151b; border-radius: 8px; padding: 12px;
+  }
+  .event-text .who { color: #c9a0ff; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<h1>脚本圈：更新与跑路</h1>
+
+<div class="panel">
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="panel">
+  <div class="log" id="log"></div>
+</div>
+
+<div class="tabs">
+  <button id="tabAct" class="active">行动</button>
+  <button id="tabScript">脚本</button>
+  <button id="tabNpc">关系</button>
+  <button id="tabInfo">信息</button>
+</div>
+
+<div class="panel" id="panelAct">
+  <div class="section-title">白天行动（消耗 AP）</div>
+  <div class="grid2" id="actions"></div>
+  <div class="section-title" style="margin-top:12px;">自定义行动（1 AP）</div>
+  <input id="customAct" placeholder="输入你想做的事（如：去贴吧发帖宣传）">
+  <button class="primary" id="btnCustomAct">执行自定义行动</button>
+</div>
+
+<div class="panel hidden" id="panelScript">
+  <div class="section-title">我的脚本</div>
+  <div id="scriptList"></div>
+  <div class="section-title" style="margin-top:12px;">新建脚本（¥500）</div>
+  <input id="newScriptName" placeholder="脚本名（如：pyhub）">
+  <input id="newScriptPrice" placeholder="价格（¥，默认 500）" type="number">
+  <input id="newScriptPower" placeholder="功能强度 1-10（默认 5）" type="number">
+  <input id="newScriptHide" placeholder="隐蔽性 1-10（默认 5）" type="number">
+  <button class="primary" id="btnNewScript">创建脚本</button>
+</div>
+
+<div class="panel hidden" id="panelNpc">
+  <div class="section-title">NPC 关系网</div>
+  <div id="npcList"></div>
+</div>
+
+<div class="panel hidden" id="panelInfo">
+  <div class="section-title">身份信息</div>
+  <div id="identityInfo" style="font-size:12px;line-height:1.8;"></div>
+  <div class="section-title" style="margin-top:12px;">派系</div>
+  <div id="factionInfo" style="font-size:12px;line-height:1.8;"></div>
+  <div class="section-title" style="margin-top:12px;">转职</div>
+  <div id="transferInfo" style="font-size:12px;line-height:1.8;"></div>
+</div>
+
+<div class="panel">
+  <div class="section-title">回合</div>
+  <button class="primary" id="btnNext">进入夜晚 / 下一天</button>
+  <button id="btnRestart">重新开始</button>
+</div>
+
+<div id="overlay" class="overlay hidden">
+  <div class="box">
+    <h2 id="ovTitle"></h2>
+    <p id="ovBody"></p>
+    <button class="primary" style="margin-top:14px" id="btnEndRestart">重新开始</button>
+  </div>
+</div>
+
+<div id="identityPicker" class="overlay hidden">
+  <div class="box">
+    <h2>选择身份</h2>
+    <div id="identityList"></div>
+  </div>
+</div>
+
+<div id="eventBox" class="overlay hidden">
+  <div class="box">
+    <h2 id="evTitle"></h2>
+    <div class="event-text" id="evText"></div>
+    <div id="evOptions"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   游戏状态
+============================================================ */
+var S = null;
+
+var FACTIONS = {
+  '免费派': ['小皮','空白','夜'],
+  '付费派': ['长夜月','小寒','shell','琼久','dyzs','rob'],
+  '黑红派': ['神仇'],
+  '代理派': ['las'],
+  '官方派': ['老K','T总'],
+  '吃瓜派': ['热搜君','阿保','云叔','刀哥']
+};
+
+var SCRIPT_TEMPLATES = [
+  { name: '免费皮', type: '免费皮', power: 3, hide: 6, price: 0 },
+  { name: '付费 hub', type: '付费 hub', power: 8, hide: 4, price: 800 },
+  { name: '恐/夜', type: '恐/夜', power: 5, hide: 7, price: 400 },
+  { name: 'atomic', type: 'atomic', power: 9, hide: 3, price: 1000 },
+  { name: 'shellhub', type: 'shellhub', power: 7, hide: 9, price: 1200 },
+  { name: 'qj', type: 'qj', power: 6, hide: 6, price: 600 }
+];
+
+function newGame(identity) {
+  identity = identity || '制作者';
+  var base = {
+    day: 1, ap: 3, apMax: 5, stress: 0,
+    phase: 'day', over: false,
+    identity: identity,
+    money: 3000, rep: 50, opinion: 50, detect: 30,
+    patience: 100, evidence: 0, fans: 1000,
+    blackHeart: 60, stock: 2, credit: 50,
+    trust: 60, blackStock: 0,
+    waterArmy: 100, credibility: 40,
+    deposit: 0, arbitration: 0, reputation: 70,
+    servers: 3, bandwidth: 100, logValue: 20,
+    clues: 0, informants: 2, deterrence: 20,
+    equity: 0, contracts: 0, contacts: 5,
+    samples: 3, techDebt: 0,
+    lastUpdateDay: 1,
+    officialTimer: 3,
+    season: 1, seasonDay: 0,
+    faction: '吃瓜派',
+    scripts: [],
+    npc: {},
+    transferDays: 0
+  };
+
+  var initMap = {
+    '顾客': { money: 2000, patience: 100 },
+    '代理': { money: 8000, blackHeart: 60, credit: 50 },
+    '官方': { money: 100000, evidence: 0, detect: 30 },
+    '视频作者': { fans: 1000, credibility: 60, blackStock: 0 },
+    '群管理员': { money: 500, reputation: 50 },
+    '鉴挂师': { money: 1500, rep: 40, opinion: 55, detect: 20, evidence: 20, samples: 3 },
+    '水军头子': { money: 5000, rep: 30, opinion: 60, detect: 10, waterArmy: 100, credibility: 40, blackStock: 2 },
+    '担保中间人': { money: 10000, rep: 55, opinion: 65, reputation: 70, deposit: 0, arbitration: 0 },
+    '云供应商': { money: 20000, rep: 45, opinion: 50, detect: 35, servers: 3, bandwidth: 100, logValue: 20 },
+    '追债人': { money: 2000, rep: 35, opinion: 40, clues: 0, informants: 2, deterrence: 20 },
+    '金主': { money: 100000, rep: 60, opinion: 50, detect: 20, equity: 0, contracts: 0, contacts: 5 }
+  };
+  var init = initMap[identity];
+  if (init) {
+    for (var k in init) { base[k] = init[k]; }
+  }
+
+  // 初始脚本
+  if (identity === '制作者') {
+    base.scripts.push({
+      id: Date.now(),
+      name: '未命名脚本',
+      type: '付费 hub',
+      power: 5,
+      hide: 5,
+      price: 500,
+      bugRate: 5,
+      rep: 0,
+      users: 0
+    });
+  }
+
+  var npcNames = ['小皮','空白','夜','长夜月','灰','东雪莲','小寒','神仇','dyzs','rob','琼久','shell','las','老K','热搜君','阿保','云叔','刀哥','T总'];
+  for (var i = 0; i < npcNames.length; i++) {
+    base.npc[npcNames[i]] = { fav: 50, trust: 50, hate: 0 };
+  }
+  base.npc['小皮'].hate = 20;
+  base.npc['长夜月'].hate = 20;
+  base.npc['神仇'].hate = 60;
+  base.npc['las'].fav = 40;
+
+  return base;
+}
+
+/* ============================================================
+   工具
+============================================================ */
+function rnd(n) { return Math.floor(Math.random() * n) + 1; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function log(msg, cls) {
+  cls = cls || '';
+  var el = document.getElementById('log');
+  var p = document.createElement('p');
+  if (cls) p.className = cls;
+  p.textContent = msg;
+  el.appendChild(p);
+  el.scrollTop = el.scrollHeight;
+}
+
+function check(difficulty, modifier) {
+  modifier = modifier || 0;
+  var roll = rnd(100);
+  var total = roll + modifier;
+  var result, cls, success;
+  if (roll <= 5) { result = '大成功'; cls = 'good'; success = true; }
+  else if (roll >= 96) { result = '大失败'; cls = 'bad'; success = false; }
+  else if (total >= difficulty) {
+    success = true;
+    if (total - difficulty <= 10) { result = '勉强成功'; cls = 'sys'; }
+    else { result = '成功'; cls = 'good'; }
+  } else { result = '失败'; cls = 'bad'; success = false; }
+  return { roll: roll, total: total, result: result, cls: cls, success: success };
+}
+
+function save() {
+  try { localStorage.setItem('scriptCircleSave', JSON.stringify(S)); } catch(e) {}
+}
+function load() {
+  try {
+    var raw = localStorage.getItem('scriptCircleSave');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function restart() {
+  try { localStorage.removeItem('scriptCircleSave'); } catch(e) {}
+  location.reload();
+}
+
+/* ============================================================
+   渲染
+============================================================ */
+function render() {
+  if (!S) return;
+  var stats = [
+    ['💰余额', S.money],
+    ['⭐声望', S.rep],
+    ['🔥舆论', S.opinion],
+    ['🛡️检测', S.detect],
+    ['😤耐心', S.patience],
+    ['⚡AP', S.ap + '/' + S.apMax],
+    ['📅天数', S.day],
+    ['😖压力', S.stress]
+  ];
+  var html = '';
+  for (var i = 0; i < stats.length; i++) {
+    var k = stats[i][0], v = stats[i][1];
+    var warn = '';
+    if (k.indexOf('耐心') >= 0 && v < 30) warn = 'warn';
+    if (k.indexOf('压力') >= 0 && v >= 80) warn = 'warn';
+    if (k.indexOf('检测') >= 0 && v >= 70) warn = 'warn';
+    html += '<div class="stat ' + warn + '"><span class="v">' + v + '</span>' + k + '</div>';
+  }
+  document.getElementById('stats').innerHTML = html;
+
+  renderActions();
+  renderScripts();
+  renderNpc();
+  renderIdentityInfo();
+  save();
+}
+
+function renderActions() {
+  var list = getActionsForIdentity(S.identity);
+  var container = document.getElementById('actions');
+  container.innerHTML = '';
+  list.forEach(function(a) {
+    var btn = document.createElement('button');
+    var dis = S.ap < a.cost || S.over;
+    if (dis) btn.disabled = true;
+    btn.innerHTML = a.name + '<br><small style="color:#8892a4">' + a.cost + ' AP</small>';
+    btn.addEventListener('click', function() { doAction(a.id); });
+    container.appendChild(btn);
+  });
+}
+
+function renderScripts() {
+  var el = document.getElementById('scriptList');
+  if (!S.scripts || S.scripts.length === 0) {
+    el.innerHTML = '<div style="color:#8892a4;font-size:12px;">还没有脚本。</div>';
+    return;
+  }
+  var html = '';
+  S.scripts.forEach(function(sc, idx) {
+    html += '<div class="script-card">' +
+      '<div class="name">📦 ' + sc.name + '（' + sc.type + '）</div>' +
+      '<div class="row">价格 <b>¥' + sc.price + '</b> · 功能 <b>' + sc.power + '</b> · 隐蔽 <b>' + sc.hide + '</b> · Bug率 <b>' + sc.bugRate + '%</b></div>' +
+      '<div class="row">顾客 <b>' + sc.users + '</b> · 口碑 <b>' + sc.rep + '</b></div>' +
+      '<button style="margin-top:6px;font-size:11px;padding:5px;" data-idx="' + idx + '" class="edit-script">修改属性</button>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+  el.querySelectorAll('.edit-script').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      editScript(parseInt(btn.getAttribute('data-idx')));
+    });
+  });
+}
+
+function renderNpc() {
+  var el = document.getElementById('npcList');
+  var html = '';
+  for (var name in S.npc) {
+    var r = S.npc[name];
+    var color = r.hate >= 70 ? '#ff7b7b' : '#7fd1ff';
+    html += '<div class="npc-row">' +
+      '<span class="npc-name">' + name + '</span>' +
+      '<span class="npc-vals">好感 <b>' + r.fav + '</b> · 信任 <b>' + r.trust + '</b> · 敌意 <b style="color:' + color + '">' + r.hate + '</b></span>' +
+      '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderIdentityInfo() {
+  var el = document.getElementById('identityInfo');
+  var extra = '';
+  if (S.identity === '代理') extra = '黑心 ' + S.blackHeart + ' · 库存 ' + S.stock + ' · 信誉 ' + S.credit;
+  else if (S.identity === '视频作者') extra = '粉丝 ' + S.fans + ' · 可信度 ' + S.credibility + ' · 黑料 ' + S.blackStock;
+  else if (S.identity === '群管理员') extra = '群人数 ' + S.groupSize + ' · 威信 ' + S.reputation;
+  else if (S.identity === '鉴挂师') extra = '证据链 ' + S.evidence + ' · 样本库 ' + S.samples;
+  else if (S.identity === '水军头子') extra = '水军 ' + S.waterArmy + ' · 可信度 ' + S.credibility + ' · 黑料库 ' + S.blackStock;
+  else if (S.identity === '担保中间人') extra = '信誉 ' + S.reputation + ' · 押金池 ¥' + S.deposit + ' · 仲裁 ' + S.arbitration;
+  else if (S.identity === '云供应商') extra = '服务器 ' + S.servers + ' · 带宽 ' + S.bandwidth + ' · 日志价值 ' + S.logValue;
+  else if (S.identity === '追债人') extra = '线索 ' + S.clues + ' · 线人网 ' + S.informants + ' · 威慑 ' + S.deterrence;
+  else if (S.identity === '金主') extra = '股权 ' + S.equity + ' · 合同 ' + S.contracts + ' · 人脉 ' + S.contacts;
+  else if (S.identity === '官方') extra = '证据链 ' + S.evidence + ' · 预算 ¥' + S.money;
+  else if (S.identity === '顾客') extra = '封号 0 · 忠诚 50 · 影响力 10';
+  else extra = '脚本制作者 · 第 ' + S.season + ' 赛季';
+  el.innerHTML = '<b style="color:#ffd479">身份：' + S.identity + '</b><br>' + extra;
+
+  document.getElementById('factionInfo').innerHTML =
+    '当前派系：<b style="color:#ffd479">' + S.faction + '</b><br>' +
+    '免费派：小皮、空白、夜<br>' +
+    '付费派：长夜月、小寒、shell、琼久<br>' +
+    '黑红派：神仇<br>' +
+    '代理派：las<br>' +
+    '<div style="color:#8892a4;margin-top:4px;">站队过深会被另一边怀疑。</div>';
+
+  // 转职信息
+  var canTransfer = [];
+  if (S.identity === '顾客' && S.transferDays >= 10) canTransfer = ['代理','视频作者','群管理员'];
+  if (S.identity === '制作者' && S.rep >= 70) canTransfer = ['金主','云供应商'];
+  if (S.identity === '代理' && S.blackHeart >= 80) canTransfer = ['担保中间人','追债人'];
+  if (S.identity === '视频作者' && S.credibility >= 80) canTransfer = ['水军头子'];
+  if (S.identity === '群管理员' && S.reputation >= 80) canTransfer = ['担保中间人','水军头子'];
+
+  var tHtml = '';
+  if (S.identity === '顾客') tHtml = '已游玩 ' + S.transferDays + ' / 10 天';
+  else if (S.identity === '制作者') tHtml = '声望 ' + S.rep + ' / 70';
+  else if (S.identity === '代理') tHtml = '黑心 ' + S.blackHeart + ' / 80';
+  else if (S.identity === '视频作者') tHtml = '可信度 ' + S.credibility + ' / 80';
+  else if (S.identity === '群管理员') tHtml = '威信 ' + S.reputation + ' / 80';
+  else tHtml = '当前身份不可转职';
+
+  if (canTransfer.length > 0) {
+    tHtml += '<br>';
+    canTransfer.forEach(function(t) {
+      tHtml += '<button style="font-size:11px;padding:6px;margin-top:4px;" onclick="doTransfer(\'' + t + '\')">转职为 ' + t + '</button>';
+    });
+  }
+  document.getElementById('transferInfo').innerHTML = tHtml;
+}
+
+/* ============================================================
+   身份行动表
+============================================================ */
+function getActionsForIdentity(id) {
+  var common = [{ id: 'rest', name: '休息', cost: 1 }];
+  var map = {
+    '制作者': [
+      { id: 'update', name: '更新脚本', cost: 2 },
+      { id: 'fixBug', name: '修 Bug', cost: 1 },
+      { id: 'research', name: '研发技术', cost: 2 },
+      { id: 'alt', name: '小号带节奏', cost: 1 },
+      { id: 'advertise', name: '发广告', cost: 1 },
+      { id: 'runaway', name: '跑路', cost: 3 }
+    ],
+    '顾客': [
+      { id: 'buy', name: '买脚本', cost: 1 },
+      { id: 'use', name: '使用脚本', cost: 1 },
+      { id: 'rights', name: '组团维权', cost: 2 },
+      { id: 'shill', name: '当托', cost: 1 },
+      { id: 'switch', name: '转投别家', cost: 1 }
+    ],
+    '代理': [
+      { id: 'sell', name: '老实分销', cost: 1 },
+      { id: 'pricecut', name: '压价', cost: 1 },
+      { id: 'stealSrc', name: '偷源码', cost: 2 },
+      { id: 'runaway', name: '收钱跑路', cost: 3 },
+      { id: 'poach', name: '挖作者', cost: 2 }
+    ],
+    '官方': [
+      { id: 'anticheat', name: '反作弊更新', cost: 2 },
+      { id: 'banwave', name: '封号潮', cost: 3 },
+      { id: 'fish', name: '钓鱼执法', cost: 2 },
+      { id: 'legal', name: '律师函', cost: 3 },
+      { id: 'spy', name: '策反内鬼', cost: 2 }
+    ],
+    '视频作者': [
+      { id: 'review', name: '评测视频', cost: 2 },
+      { id: 'expose', name: '挂人视频', cost: 2 },
+      { id: 'gossip', name: '八卦视频', cost: 1 },
+      { id: 'hush', name: '收封口费', cost: 1 }
+    ],
+    '群管理员': [
+      { id: 'manage', name: '群管理操作', cost: 1 },
+      { id: 'protect', name: '收保护费', cost: 1 },
+      { id: 'side', name: '站队', cost: 1 },
+      { id: 'moles', name: '当内鬼', cost: 2 }
+    ],
+    '鉴挂师': [
+      { id: 'sample', name: '抽样测试', cost: 1 },
+      { id: 'reverse', name: '逆向分析', cost: 2 },
+      { id: 'report', name: '出鉴定帖', cost: 1 },
+      { id: 'sellReport', name: '卖报告', cost: 1 },
+      { id: 'recruit', name: '合作收编', cost: 2 }
+    ],
+    '水军头子': [
+      { id: 'stir', name: '发帖带节奏', cost: 1 },
+      { id: 'control', name: '控评', cost: 1 },
+      { id: 'hotsearch', name: '买热搜', cost: 2 },
+      { id: 'whitewash', name: '洗白', cost: 2 },
+      { id: 'smear', name: '抹黑', cost: 2 },
+      { id: 'reverseAct', name: '反串', cost: 1 }
+    ],
+    '担保中间人': [
+      { id: 'guarantee', name: '开担保', cost: 1 },
+      { id: 'arbitrate', name: '仲裁', cost: 2 },
+      { id: 'match', name: '撮合合作', cost: 1 },
+      { id: 'advance', name: '垫付', cost: 1 },
+      { id: 'runaway', name: '卷押金跑路', cost: 3 }
+    ],
+    '云供应商': [
+      { id: 'expand', name: '扩容', cost: 2 },
+      { id: 'maintain', name: '维护', cost: 1 },
+      { id: 'sellCloud', name: '卖云更新', cost: 1 },
+      { id: 'cutoff', name: '断供', cost: 1 },
+      { id: 'sellLog', name: '卖日志', cost: 2 },
+      { id: 'resist', name: '抗压', cost: 2 }
+    ],
+    '追债人': [
+      { id: 'takeOrder', name: '接单', cost: 1 },
+      { id: 'investigate', name: '调查', cost: 2 },
+      { id: 'negotiate', name: '谈判', cost: 1 },
+      { id: 'exposeDebt', name: '曝光', cost: 1 },
+      { id: 'recover', name: '追回', cost: 2 },
+      { id: 'antiTrack', name: '反追踪', cost: 1 }
+    ],
+    '金主': [
+      { id: 'invest', name: '投资', cost: 2 },
+      { id: 'bet', name: '签对赌', cost: 1 },
+      { id: 'buyOpinion', name: '买舆论', cost: 2 },
+      { id: 'poachTeam', name: '挖团队', cost: 2 },
+      { id: 'withdraw', name: '撤资', cost: 1 },
+      { id: 'openPlatform', name: '开平台', cost: 3 }
+    ]
+  };
+  var arr = map[id] || common.slice();
+  var arrCopy = arr.slice();
+  for (var i = 0; i < common.length; i++) {
+    var found = false;
+    for (var j = 0; j < arr.length; j++) {
+      if (arr[j].id === common[i].id) { found = true; break; }
+    }
+    if (!found) arrCopy.push(common[i]);
+  }
+  return arrCopy;
+}
+
+/* ============================================================
+   行动处理
+============================================================ */
+var AP_COST = {
+  update: 2, fixBug: 1, research: 2, alt: 1, runaway: 3, advertise: 1,
+  buy: 1, use: 1, rights: 2, shill: 1, switch: 1,
+  sell: 1, pricecut: 1, stealSrc: 2, poach: 2,
+  anticheat: 2, banwave: 3, fish: 2, legal: 3, spy: 2,
+  review: 2, expose: 2, gossip: 1, hush: 1,
+  manage: 1, protect: 1, side: 1, moles: 2,
+  sample: 1, reverse: 2, report: 1, sellReport: 1, recruit: 2,
+  stir: 1, control: 1, hotsearch: 2, whitewash: 2, smear: 2, reverseAct: 1,
+  guarantee: 1, arbitrate: 2, match: 1, advance: 1,
+  expand: 2, maintain: 1, sellCloud: 1, cutoff: 1, sellLog: 2, resist: 2,
+  takeOrder: 1, investigate: 2, negotiate: 1, exposeDebt: 1, recover: 2, antiTrack: 1,
+  invest: 2, bet: 1, buyOpinion: 2, poachTeam: 2, withdraw: 1, openPlatform: 3,
+  rest: 1
+};
+
+function doAction(id) {
+  if (!S || S.over) return;
+  var cost = AP_COST[id] || 1;
+  if (S.ap < cost) { log('AP 不足。', 'bad'); return; }
+  S.ap -= cost;
+
+  var handler = ACTIONS[id];
+  if (handler) handler();
+  else log('【' + id + '】暂未实现。');
+
+  checkEnding();
+  render();
+}
+
+/* ============================================================
+   行动实现
+============================================================ */
+var ACTIONS = {
+  rest: function() {
+    S.stress = clamp(S.stress - 20, 0, 100);
+    log('【休息】压力 -20。', 'good');
+  },
+
+  update: function() {
+    if (!S.scripts || S.scripts.length === 0) {
+      log('【更新脚本】你没有脚本可以更新。', 'bad');
+      return;
+    }
+    var sc = S.scripts[0];
+    S.lastUpdateDay = S.day;
+    S.patience = clamp(S.patience + 20, -50, 120);
+    S.rep += 2;
+    sc.rep += 2;
+    log('【更新 ' + sc.name + '】发布新版本，顾客耐心 +20，声望 +2，脚本口碑 +2。', 'good');
+  },
+  fixBug: function() {
+    if (!S.scripts || S.scripts.length === 0) { log('【修 Bug】没有脚本。', 'bad'); return; }
+    var sc = S.scripts[0];
+    sc.bugRate = Math.max(0, sc.bugRate - 2);
+    S.patience = clamp(S.patience + 8, -50, 120);
+    log('【修 ' + sc.name + ' 的 Bug】Bug 率 -2%，耐心 +8。', 'good');
+  },
+  research: function() {
+    if (!S.scripts || S.scripts.length === 0) { log('【研发】没有脚本。', 'bad'); return; }
+    var c = check(60, Math.floor(S.rep / 10));
+    if (c.success) {
+      S.scripts[0].hide = Math.min(10, S.scripts[0].hide + 1);
+      S.rep += 5; S.detect -= 3;
+      log('【研发技术】d100=' + c.roll + ' 总=' + c.total + ' → ' + c.result + '。脚本隐蔽 +1，声望 +5，检测 -3。', c.cls);
+    } else {
+      S.money -= 200; S.stress += 5;
+      log('【研发技术】d100=' + c.roll + ' 总=' + c.total + ' → ' + c.result + '。损失 ¥200，压力 +5。', c.cls);
+    }
+  },
+  alt: function() {
+    var c = check(50);
+    if (c.success) { S.opinion += 5; log('【小号带节奏】d100=' + c.roll + ' → ' + c.result + '。舆论 +5。', c.cls); }
+    else { S.opinion -= 8; S.rep -= 3; log('【小号带节奏】d100=' + c.roll + ' → ' + c.result + '。被识破，舆论 -8，声望 -3。', c.cls); }
+  },
+  advertise: function() {
+    if (S.money < 100) { log('没钱发广告。', 'bad'); return; }
+    S.money -= 100;
+    if (!S.scripts || S.scripts.length === 0) { log('【发广告】花 ¥100，但没有脚本可推广。', 'sys'); return; }
+    var sc = S.scripts[0];
+    sc.users += 3;
+    sc.rep += 1;
+    log('【发广告】花 ¥100，' + sc.name + ' 顾客 +3，口碑 +1。', 'good');
+  },
+  runaway: function() {
+    S.money += 50000; S.rep = 0; S.opinion = 0;
+    showEnding('💸 跑路之王', '你卷走 ¥50000，声望归零，全网通缉。追债人已经盯上你了。');
+  },
+
+  buy: function() {
+    if (S.money < 500) { log('余额不足，买不起。', 'bad'); return; }
+    S.money -= 500;
+    log('【买脚本】花 ¥500 买了一份脚本。', 'sys');
+    S._hasScript = true;
+  },
+  use: function() {
+    if (!S._hasScript) { log('你还没买脚本。', 'bad'); return; }
+    var c = check(40 + S.detect);
+    if (c.success) log('【使用脚本】d100=' + c.roll + ' 总=' + c.total + ' → ' + c.result + '。今天没被封。', c.cls);
+    else {
+      log('【使用脚本】d100=' + c.roll + ' 总=' + c.total + ' → ' + c.result + '。账号被封！', 'bad');
+      S.patience = 0; S.opinion -= 5;
+    }
+  },
+  rights: function() {
+    var c = check(60, Math.floor(S.opinion / 10));
+    if (c.success) { S.opinion += 5; log('【组团维权】d100=' + c.roll + ' → ' + c.result + '。作者被迫回应，舆论 +5。', c.cls); }
+    else { log('【组团维权】d100=' + c.roll + ' → ' + c.result + '。没人理你。', c.cls); }
+  },
+  shill: function() {
+    var c = check(50);
+    if (c.success) { S.money += 300; log('【当托】d100=' + c.roll + ' → ' + c.result + '。赚了 ¥300。', c.cls); }
+    else { S.opinion -= 10; log('【当托】d100=' + c.roll + ' → ' + c.result + '。被识破，舆论 -10。', c.cls); }
+  },
+  switch: function() {
+    S.patience = clamp(S.patience + 15, -50, 120);
+    log('【转投别家】换了个作者，耐心 +15。', 'good');
+  },
+
+  sell: function() {
+    var income = 800 + Math.floor(S.credit * 5);
+    S.money += income;
+    S.credit += 2;
+    log('【老实分销】赚 ¥' + income + '，信誉 +2。', 'good');
+  },
+  pricecut: function() {
+    var income = 1200;
+    S.money += income; S.blackHeart += 5;
+    if (S.npc['小寒']) S.npc['小寒'].fav -= 5;
+    log('【压价】赚 ¥' + income + '，黑心 +5，作者不爽。', 'sys');
+  },
+  stealSrc: function() {
+    var c = check(70);
+    if (c.success) { S.blackHeart += 15; S.money += 2000; log('【偷源码】d100=' + c.roll + ' → ' + c.result + '。得手，黑心 +15，赚 ¥2000。', 'bad'); }
+    else { S.rep -= 20; S.opinion -= 25; log('【偷源码】d100=' + c.roll + ' → ' + c.result + '。被发现，全网挂你！', 'bad'); }
+  },
+  poach: function() {
+    var c = check(65);
+    if (c.success) { S.stock += 1; S.rep += 3; log('【挖作者】d100=' + c.roll + ' → ' + c.result + '。抢到独家，库存 +1。', c.cls); }
+    else { S.npc['长夜月'].hate += 15; log('【挖作者】d100=' + c.roll + ' → ' + c.result + '。结仇。', c.cls); }
+  },
+
+  anticheat: function() { S.detect = clamp(S.detect + 10, 0, 100); log('【反作弊更新】检测 +10。', 'sys'); },
+  banwave: function() {
+    S.detect = clamp(S.detect + 15, 0, 100);
+    S.evidence += 10;
+    log('【封号潮】检测 +15，证据链 +10。', 'sys');
+  },
+  fish: function() {
+    var c = check(60);
+    if (c.success) { S.evidence += 20; log('【钓鱼执法】d100=' + c.roll + ' → ' + c.result + '。证据链 +20。', c.cls); }
+    else { S.opinion -= 10; log('【钓鱼执法】d100=' + c.roll + ' → ' + c.result + '。暴露，舆论 -10。', c.cls); }
+  },
+  legal: function() {
+    if (S.evidence < 80) { log('证据链不足 80，律师函发不出去。', 'bad'); return; }
+    showEnding('🚫 官方铁拳', '证据链 ≥80，你成功发出律师函，头部作者被端。');
+  },
+  spy: function() {
+    var c = check(55);
+    if (c.success) { S.evidence += 15; log('【策反内鬼】d100=' + c.roll + ' → ' + c.result + '。获得线索，证据链 +15。', c.cls); }
+    else { log('【策反内鬼】d100=' + c.roll + ' → ' + c.result + '。失败。', c.cls); }
+  },
+
+  review: function() {
+    var c = check(50, Math.floor(S.credibility / 10));
+    if (c.success) { S.fans += 500; S.money += 300; log('【评测视频】d100=' + c.roll + ' → ' + c.result + '。粉丝 +500，赚 ¥300。', c.cls); }
+    else { S.credibility -= 5; log('【评测视频】d100=' + c.roll + ' → ' + c.result + '。被骂，可信度 -5。', c.cls); }
+  },
+  expose: function() {
+    var c = check(65, Math.floor(S.credibility / 10));
+    if (c.success) { S.fans += 2000; S.opinion += 10; log('【挂人视频】d100=' + c.roll + ' → ' + c.result + '。实锤，粉丝 +2000。', c.cls); }
+    else { S.fans -= 800; S.credibility -= 15; log('【挂人视频】d100=' + c.roll + ' → ' + c.result + '。锤错人，翻车！', 'bad'); }
+  },
+  gossip: function() {
+    S.fans += 800; S.credibility -= 3;
+    log('【八卦视频】粉丝 +800，可信度 -3。', 'sys');
+  },
+  hush: function() {
+    S.money += 3000; S.credibility -= 10;
+    log('【收封口费】赚 ¥3000，可信度 -10。', 'sys');
+  },
+
+  manage: function() {
+    var c = check(50, Math.floor(S.reputation / 10));
+    if (c.success) { S.reputation += 5; log('【群管理操作】d100=' + c.roll + ' → ' + c.result + '。威信 +5。', c.cls); }
+    else { S.reputation -= 5; log('【群管理操作】d100=' + c.roll + ' → ' + c.result + '。威信 -5。', c.cls); }
+  },
+  protect: function() { S.money += 500; log('【收保护费】赚 ¥500。', 'good'); },
+  side: function() {
+    S.npc['小皮'].fav += 10; S.npc['长夜月'].hate += 10;
+    S.faction = '免费派';
+    log('【站队】你站了小皮，长夜月敌意 +10，加入免费派。', 'sys');
+  },
+  moles: function() { S.money += 1000; S.opinion -= 8; log('【当内鬼】赚 ¥1000，舆论 -8。', 'sys'); },
+
+  sample: function() { S.samples += 1; S.evidence += 5; log('【抽样测试】样本 +1，证据链 +5。', 'good'); },
+  reverse: function() {
+    var c = check(70, Math.floor(S.samples * 2));
+    if (c.success) { S.evidence += 15; log('【逆向分析】d100=' + c.roll + ' → ' + c.result + '。证据链 +15。', c.cls); }
+    else { S.techDebt += 1; log('【逆向分析】d100=' + c.roll + ' → ' + c.result + '。技术债 +1。', c.cls); }
+  },
+  report: function() {
+    var c = check(60, Math.floor(S.evidence / 10));
+    if (c.success) { S.rep += 10; log('【出鉴定帖】d100=' + c.roll + ' → ' + c.result + '。声望 +10。', c.cls); }
+    else { S.opinion -= 25; S.credibility -= 15; log('【出鉴定帖】d100=' + c.roll + ' → ' + c.result + '。锤错人，舆论 -25。', 'bad'); }
+  },
+  sellReport: function() { S.money += 1500; log('【卖报告】赚 ¥1500。', 'good'); },
+  recruit: function() { S.money += 2000; log('【合作收编】赚 ¥2000。', 'good'); },
+
+  stir: function() {
+    var c = check(50, Math.floor(S.waterArmy / 10));
+    if (c.success) { S.opinion += 5; log('【发帖带节奏】d100=' + c.roll + ' → ' + c.result + '。舆论 +5。', c.cls); }
+    else { S.credibility -= 5; log('【发帖带节奏】d100=' + c.roll + ' → ' + c.result + '。可信度 -5。', c.cls); }
+  },
+  control: function() { S.opinion += 3; log('【控评】舆论 +3。', 'sys'); },
+  hotsearch: function() {
+    if (S.money < 2000) { log('钱不够买热搜。', 'bad'); return; }
+    S.money -= 2000; S.opinion += 15;
+    log('【买热搜】花 ¥2000，舆论 +15。', 'good');
+  },
+  whitewash: function() { S.opinion += 10; S.credibility -= 5; log('【洗白】舆论 +10，可信度 -5。', 'sys'); },
+  smear: function() {
+    var c = check(55);
+    if (c.success) { S.opinion -= 10; log('【抹黑】d100=' + c.roll + ' → ' + c.result + '。目标舆论 -10。', 'bad'); }
+    else { S.credibility -= 10; log('【抹黑】d100=' + c.roll + ' → ' + c.result + '。被扒，可信度 -10。', 'bad'); }
+  },
+  reverseAct: function() { S.npc['小皮'].hate += 5; S.npc['长夜月'].hate += 5; log('【反串】制造对立，双方敌意 +5。', 'sys'); },
+
+  guarantee: function() { S.deposit += 5000; S.reputation += 2; log('【开担保】押金池 +5000，信誉 +2。', 'good'); },
+  arbitrate: function() {
+    var c = check(60, Math.floor(S.reputation / 10));
+    if (c.success) { S.reputation += 5; S.arbitration += 1; log('【仲裁】d100=' + c.roll + ' → ' + c.result + '。信誉 +5。', c.cls); }
+    else { S.reputation -= 10; log('【仲裁】d100=' + c.roll + ' → ' + c.result + '。信誉 -10。', 'bad'); }
+  },
+  match: function() { S.money += 500; S.npc['小寒'].fav += 5; log('【撮合合作】赚 ¥500，双方好感 +5。', 'good'); },
+  advance: function() { S.money -= 1000; S.reputation += 10; log('【垫付】赔 ¥1000，信誉 +10。', 'sys'); },
+
+  expand: function() {
+    if (S.money < 3000) { log('钱不够扩容。', 'bad'); return; }
+    S.money -= 3000; S.servers += 1;
+    log('【扩容】花 ¥3000，服务器 +1。', 'good');
+  },
+  maintain: function() { S.bandwidth += 10; log('【维护】带宽 +10。', 'good'); },
+  sellCloud: function() { S.money += 2000; log('【卖云更新】赚 ¥2000。', 'good'); },
+  cutoff: function() { S.npc['小寒'].fav -= 20; S.patience -= 20; log('【断供】作者耐心 -20，关系 -20。', 'bad'); },
+  sellLog: function() { S.money += 3000; S.detect += 10; log('【卖日志】赚 ¥3000，检测 +10。', 'sys'); },
+  resist: function() {
+    var c = check(65, Math.floor(S.servers * 5));
+    if (c.success) log('【抗压】d100=' + c.roll + ' → ' + c.result + '。顶住了。', c.cls);
+    else { S.servers = Math.max(0, S.servers - 1); log('【抗压】d100=' + c.roll + ' → ' + c.result + '。被端一台服务器。', 'bad'); }
+  },
+
+  takeOrder: function() { S.money += 500; S.clues += 5; log('【接单】预付款 ¥500，线索 +5。', 'good'); },
+  investigate: function() { S.clues += 10; log('【调查】线索 +10。', 'good'); },
+  negotiate: function() {
+    var c = check(50, Math.floor(S.clues / 10));
+    if (c.success) { S.money += 800; log('【谈判】d100=' + c.roll + ' → ' + c.result + '。追回 ¥800。', c.cls); }
+    else log('【谈判】d100=' + c.roll + ' → ' + c.result + '。谈崩了。', c.cls);
+  },
+  exposeDebt: function() { S.npc['las'].hate += 15; log('【曝光】目标舆论 -15。', 'sys'); },
+  recover: function() {
+    var c = check(70, Math.floor(S.clues / 10) + Math.floor(S.deterrence / 10));
+    if (c.success) { S.money += 5000; S.rep += 5; log('【追回】d100=' + c.roll + ' → ' + c.result + '。追回 ¥5000，声望 +5。', c.cls); }
+    else log('【追回】d100=' + c.roll + ' → ' + c.result + '。失败。', c.cls);
+  },
+  antiTrack: function() { S.deterrence += 5; log('【反追踪】威慑 +5。', 'good'); },
+
+  invest: function() {
+    if (S.money < 10000) { log('钱不够投资。', 'bad'); return; }
+    S.money -= 10000; S.equity += 1;
+    log('【投资】花 ¥10000，股权 +1。', 'good');
+  },
+  bet: function() { S.contracts += 1; S.npc['小寒'].hate += 5; log('【签对赌】合同 +1，作者压力 +20。', 'sys'); },
+  buyOpinion: function() { S.money -= 5000; S.opinion += 15; log('【买舆论】花 ¥5000，舆论 +15。', 'good'); },
+  poachTeam: function() {
+    var c = check(65);
+    if (c.success) { S.equity += 1; log('【挖团队】d100=' + c.roll + ' → ' + c.result + '。挖到一支团队。', c.cls); }
+    else { S.npc['长夜月'].hate += 20; log('【挖团队】d100=' + c.roll + ' → ' + c.result + '。结仇。', c.cls); }
+  },
+  withdraw: function() { S.money += 5000; S.npc['小寒'].hate += 30; log('【撤资】收回 ¥5000，目标敌意 +30。', 'sys'); },
+  openPlatform: function() { S.equity += 2; S.rep += 10; log('【开平台】建新 hub，股权 +2，声望 +10。', 'good'); }
+};
+
+/* ============================================================
+   脚本管理
+============================================================ */
+function editScript(idx) {
+  var sc = S.scripts[idx];
+  var newName = prompt('脚本名：', sc.name);
+  if (newName === null) return;
+  var newPrice = prompt('价格（¥）：', sc.price);
+  var newPower = prompt('功能强度 1-10：', sc.power);
+  var newHide = prompt('隐蔽性 1-10：', sc.hide);
+  if (newName) sc.name = newName;
+  if (newPrice !== null && !isNaN(parseInt(newPrice))) sc.price = parseInt(newPrice);
+  if (newPower !== null && !isNaN(parseInt(newPower))) sc.power = clamp(parseInt(newPower), 1, 10);
+  if (newHide !== null && !isNaN(parseInt(newHide))) sc.hide = clamp(parseInt(newHide), 1, 10);
+  log('【修改脚本】' + sc.name + '：价格 ¥' + sc.price + '，功能 ' + sc.power + '，隐蔽 ' + sc.hide, 'sys');
+  render();
+}
+
+function createScript() {
+  if (S.money < 500) { log('创建脚本需要 ¥500。', 'bad'); return; }
+  var name = document.getElementById('newScriptName').value.trim() || '新脚本';
+  var price = parseInt(document.getElementById('newScriptPrice').value) || 500;
+  var power = clamp(parseInt(document.getElementById('newScriptPower').value) || 5, 1, 10);
+  var hide = clamp(parseInt(document.getElementById('newScriptHide').value) || 5, 1, 10);
+  S.money -= 500;
+  S.scripts.push({
+    id: Date.now(),
+    name: name,
+    type: '自定义',
+    power: power,
+    hide: hide,
+    price: price,
+    bugRate: 5,
+    rep: 0,
+    users: 0
+  });
+  document.getElementById('newScriptName').value = '';
+  document.getElementById('newScriptPrice').value = '';
+  document.getElementById('newScriptPower').value = '';
+  document.getElementById('newScriptHide').value = '';
+  log('【创建脚本】' + name + '（¥' + price + '，功能 ' + power + '，隐蔽 ' + hide + '）', 'good');
+  render();
+}
+
+/* ============================================================
+   自定义行动
+============================================================ */
+var CUSTOM_KEYWORDS = [
+  { keys: ['更新','发布','推送'], fn: function() { S.patience += 10; S.rep += 1; return '更新相关，顾客耐心 +10，声望 +1。'; } },
+  { keys: ['修','bug','Bug','修复'], fn: function() { S.patience += 5; return '修 Bug，耐心 +5。'; } },
+  { keys: ['宣传','广告','推广','拉人'], fn: function() { if (S.money >= 100) { S.money -= 100; S.rep += 2; return '花 ¥100 宣传，声望 +2。'; } return '钱不够。'; } },
+  { keys: ['私聊','谈','合作','聊天'], fn: function() { var n = pick(['小寒','shell','琼久','dyzs']); S.npc[n].fav += 3; return '和 ' + n + ' 私聊，好感 +3。'; } },
+  { keys: ['休息','睡','摸鱼'], fn: function() { S.stress = Math.max(0, S.stress - 15); return '摸鱼，压力 -15。'; } },
+  { keys: ['跑路','卷钱'], fn: function() { S.money += 30000; S.over = true; return '你跑路了！'; } },
+  { keys: ['发帖','挂人','锤'], fn: function() { S.opinion += 3; return '发帖挂人，舆论 +3。'; } },
+  { keys: ['水军','刷','节奏'], fn: function() { S.opinion += 5; S.credibility -= 3; return '刷节奏，舆论 +5，可信度 -3。'; } },
+  { keys: ['研发','技术','升级'], fn: function() { S.rep += 3; S.detect -= 2; return '研发，声望 +3，检测 -2。'; } },
+  { keys: ['买','进货','采购'], fn: function() { if (S.money >= 500) { S.money -= 500; S.stock += 1; return '花 ¥500 进货，库存 +1。'; } return '钱不够。'; } },
+  { keys: ['卖','分销','出货'], fn: function() { var inc = 300 + Math.floor(Math.random() * 400); S.money += inc; return '卖出，赚 ¥' + inc + '。'; } },
+  { keys: ['举报','举报官方','交证据'], fn: function() { S.evidence += 5; return '提交证据，证据链 +5。'; } },
+  { keys: ['跑路','消失'], fn: function() { S.money += 20000; S.over = true; return '你消失了。'; } }
+];
+
+function doCustomAction() {
+  if (!S || S.over) return;
+  if (S.ap < 1) { log('AP 不足。', 'bad'); return; }
+  var txt = document.getElementById('customAct').value.trim();
+  if (!txt) { log('请输入你想做的事。', 'bad'); return; }
+  S.ap -= 1;
+  var matched = false;
+  for (var i = 0; i < CUSTOM_KEYWORDS.length; i++) {
+    var k = CUSTOM_KEYWORDS[i];
+    for (var j = 0; j < k.keys.length; j++) {
+      if (txt.indexOf(k.keys[j]) >= 0) {
+        var feedback = k.fn();
+        log('【自定义·' + txt + '】' + feedback, 'sys');
+        matched = true;
+        break;
+      }
+    }
+    if (matched) break;
+  }
+  if (!matched) {
+    // 随机小反馈
+    var roll = rnd(3);
+    if (roll === 1) { S.opinion += 1; log('【自定义·' + txt + '】' + '你做了这件事，群里有人点了赞，舆论 +1。', 'sys'); }
+    else if (roll === 2) { S.stress += 2; log('【自定义·' + txt + '】' + '你做了这件事，有点累，压力 +2。', 'sys'); }
+    else { log('【自定义·' + txt + '】' + '你做了这件事，似乎没什么反应。', 'sys'); }
+  }
+  document.getElementById('customAct').value = '';
+  checkEnding();
+  render();
+}
+
+/* ============================================================
+   转职
+============================================================ */
+function doTransfer(newIdentity) {
+  if (!confirm('确认转职为 ' + newIdentity + '？')) return;
+  var oldIdentity = S.identity;
+  S.identity = newIdentity;
+  log('【转职】你从 ' + oldIdentity + ' 转职为 ' + newIdentity + '。', 'sys');
+
+  // 转职专属初始化
+  if (newIdentity === '代理') { S.blackHeart = 60; S.credit = 50; }
+  if (newIdentity === '视频作者') { S.fans = 1000; S.credibility = 60; }
+  if (newIdentity === '群管理员') { S.reputation = 50; S.groupSize = 500; }
+  if (newIdentity === '金主') { S.equity = 0; S.contracts = 0; }
+  if (newIdentity === '担保中间人') { S.reputation = 70; S.deposit = 0; }
+  if (newIdentity === '水军头子') { S.waterArmy = 100; S.credibility = 40; }
+
+  render();
+}
+
+/* ============================================================
+   夜晚结算
+============================================================ */
+function nextPhase() {
+  if (!S || S.over) return;
+
+  if (S.identity === '顾客') S.transferDays++;
+
+  var daysSince = S.day - S.lastUpdateDay;
+  if (daysSince > 0 && (S.identity === '制作者' || S.identity === '代理')) {
+    var drop = daysSince * 8;
+    S.patience = clamp(S.patience - drop, -50, 120);
+    if (drop > 0) log('【结算】距上次更新 ' + daysSince + ' 天，顾客耐心 -' + drop + '。', drop > 10 ? 'bad' : '');
+  }
+
+  S.detect = clamp(S.detect + 2, 0, 100);
+  if (S.opinion > 50) S.opinion -= 1;
+  if (S.opinion < 50) S.opinion += 1;
+  S.stress = clamp(S.stress + 3, 0, 100);
+
+  var income = 300 + Math.floor(S.rep * 5) - Math.floor(S.detect * 2);
+  S.money += income;
+  log('【结算】今日收入 ¥' + income + '，检测 +2，压力 +3。', 'sys');
+
+  for (var n in S.npc) {
+    S.npc[n].hate = clamp(S.npc[n].hate - 1, 0, 100);
+  }
+
+  nightEvent();
+
+  S.officialTimer--;
+  if (S.officialTimer <= 0) {
+    S.officialTimer = 3 + rnd(3);
+    officialWheel();
+  }
+
+  // 赛季
+  S.seasonDay++;
+  if (S.seasonDay >= 30) {
+    S.seasonDay = 0;
+    S.season++;
+    S.detect = 30;
+    S.patience = 100;
+    log('【新赛季】第 ' + S.season + ' 赛季开始！官方大更新，脚本洗牌，检测重置。', 'sys');
+  }
+
+  if (S.patience < 0 && (S.identity === '制作者' || S.identity === '代理')) {
+    log('【危机】顾客耐心归零，有人开始挂你！', 'bad');
+    S.rep -= 10; S.opinion -= 15;
+  }
+  if (S.stress >= 100) {
+    showEnding('🌫️ 隐退', '压力爆表，你退圈了。传说仍在。');
+    return;
+  }
+
+  S.day++;
+  S.ap = 3;
+  render();
+}
+
+/* ============================================================
+   深夜事件（用文档原话）
+============================================================ */
+function nightEvent() {
+  var roll = rnd(100);
+
+  var goodEvents = [
+    { text: '一位老顾客给你发了 ¥500 红包，附言："哥，别跑路就行。"', fn: function() { S.money += 500; } },
+    { text: '有人在你群里夸你："这脚本是真的稳，小寒都不如你。"', fn: function() { S.rep += 5; } },
+    { text: '一条好评被顶上热搜，你的名字出现在圈内榜单。', fn: function() { S.opinion += 8; } }
+  ];
+  var minorEvents = [
+    { text: '"哥，三天了，还更不更？隔壁小寒都更两版了，你搁这养老呢？"', fn: function() { S.patience -= 5; } },
+    { text: '凌晨三点，你还在改代码，眼睛干得睁不开。', fn: function() { S.stress += 5; } },
+    { text: '官方小更新，群里开始慌了。', fn: function() { S.detect += 3; } }
+  ];
+  var dailyEvents = [
+    { text: '群里在聊神仇又跟谁对线，你看了会儿没说话。', fn: function() {} },
+    { text: '热搜上挂着别的圈子的事，风平浪静。', fn: function() {} },
+    { text: '有人私聊问价，你回了个"稍等"，然后忘了。', fn: function() {} }
+  ];
+  var troubleEvents = [
+    { text: '【官方反作弊更新】本次更新将重点检测 hub 类脚本，请各位玩家注意账号安全。', fn: function() { S.detect += 5; } },
+    { text: '"你这脚本怎么又卡了？退钱！"', fn: function() { S.opinion -= 8; } },
+    { text: '长夜月小号「灰」在群里说："小皮那脚本也就免费能看，真用起来还不如 pyhub 一根毛。"', fn: function() { S.npc['小皮'].hate += 5; } }
+  ];
+  var crisisEvents = [
+    { text: '官方封号潮！一晚上群里全是"我被封了"。', fn: function() { S.detect += 15; S.patience -= 20; } },
+    { text: '神仇挂人帖："某付费 hub 作者抄我 atomic 代码，证据如下。不服来对线。"', fn: function() { S.rep -= 15; S.opinion -= 20; } },
+    { text: 'las 私聊你："兄弟，你这个脚本我帮你代理，抽成 40%，走量，考虑一下？"', fn: function() { S.npc['las'].hate += 20; } },
+    { text: '琼久被网暴后发帖："神仇粉丝别来我群，来一个踢一个。"', fn: function() { S.opinion -= 5; } }
+  ];
+
+  var ev;
+  if (roll <= 10) ev = pick(goodEvents);
+  else if (roll <= 30) ev = pick(minorEvents);
+  else if (roll <= 60) ev = pick(dailyEvents);
+  else if (roll <= 85) ev = pick(troubleEvents);
+  else ev = pick(crisisEvents);
+
+  ev.fn();
+  log('【深夜】' + ev.text, roll > 60 ? 'bad' : '');
+
+  // 身份专属事件
+  if (S.identity === '代理' && roll > 60 && roll <= 85) {
+    S.blackHeart += 5;
+    log('【深夜·代理】有跑路机会，黑心 +5。', 'sys');
+  }
+  if (S.identity === '水军头子' && roll > 30 && roll <= 60) {
+    S.waterArmy -= 10;
+    log('【深夜·水军】一批水军账号被封，库存 -10。', 'bad');
+  }
+  if (S.identity === '云供应商' && roll > 60 && roll <= 85) {
+    S.servers = Math.max(0, S.servers - 1);
+    log('【深夜·云】服务器被攻击，-1 台。', 'bad');
+  }
+}
+
+/* ============================================================
+   NPC 主动找
+============================================================ */
+function npcVisit() {
+  if (!S || S.over) return;
+  if (rnd(100) > 35) return; // 35% 概率触发
+
+  var visitor = pick(['小皮','长夜月','小寒','神仇','las','老K','热搜君','T总']);
+  var ev = {
+    title: '【' + visitor + ' 找你】',
+    text: '',
+    options: []
+  };
+
+  if (visitor === '小皮') {
+    ev.text = '小皮私聊你："兄弟，最近官方盯得紧，你那脚本隐蔽性怎么样？要不要交流下技术？"';
+    ev.options = [
+      { label: '交流技术', fn: function() { S.npc['小皮'].fav += 10; S.npc['小皮'].trust += 5; log('你和小皮交流了技术，好感 +10，信任 +5。', 'good'); } },
+      { label: '拒绝', fn: function() { S.npc['小皮'].fav -= 5; log('你拒绝了小皮，好感 -5。', 'bad'); } }
+    ];
+  } else if (visitor === '长夜月') {
+    ev.text = '长夜月用小号「灰」在群里发："听说有人脚本隐蔽性吹上天，实际三天一封，笑死。"';
+    ev.options = [
+      { label: '回怼', fn: function() { S.opinion += 5; S.npc['长夜月'].hate += 10; log('你回怼了长夜月，舆论 +5，敌意 +10。', 'sys'); } },
+      { label: '装没看见', fn: function() { S.npc['长夜月'].hate += 3; log('你装没看见，长夜月更嚣张了，敌意 +3。', 'bad'); } }
+    ];
+  } else if (visitor === '小寒') {
+    ev.text = '小寒私聊你："我最近在研究反检测，你要不要一起？成本我出，收益对半。"';
+    ev.options = [
+      { label: '合作', fn: function() { S.rep += 3; S.npc['小寒'].fav += 10; S.money -= 500; log('你和小寒合作，声望 +3，好感 +10，投入 ¥500。', 'good'); } },
+      { label: '婉拒', fn: function() { S.npc['小寒'].fav -= 3; log('你婉拒了小寒，好感 -3。', 'sys'); } }
+    ];
+  } else if (visitor === '神仇') {
+    ev.text = '神仇发帖："某 hub 作者不敢接对线，怕了吧？"';
+    ev.options = [
+      { label: '接对线', fn: function() { S.opinion += 10; S.npc['神仇'].hate += 15; log('你接了对线，舆论 +10，神仇敌意 +15。', 'sys'); } },
+      { label: '无视', fn: function() { S.opinion -= 5; log('你无视了神仇，被骂怂，舆论 -5。', 'bad'); } }
+    ];
+  } else if (visitor === 'las') {
+    ev.text = 'las 私聊你："兄弟，你这个脚本我帮你代理，抽成 40%，走量，考虑一下？"';
+    ev.options = [
+      { label: '接受代理', fn: function() { S.money += 2000; S.npc['las'].fav += 10; log('las 帮你代理，先给 ¥2000，好感 +10。', 'good'); } },
+      { label: '拒绝', fn: function() { S.npc['las'].hate += 10; log('你拒绝了 las，敌意 +10。', 'bad'); } }
+    ];
+  } else if (visitor === '老K') {
+    ev.text = '老K 私聊你："我手里有你脚本的样本，考虑一下收编？费用 ¥2000。"';
+    ev.options = [
+      { label: '给钱', fn: function() { if (S.money < 2000) { log('钱不够。', 'bad'); return; } S.money -= 2000; S.evidence -= 10; log('你给了老K ¥2000，证据链 -10。', 'sys'); } },
+      { label: '拒绝', fn: function() { S.evidence += 15; log('你拒绝了老K，证据链 +15。', 'bad'); } }
+    ];
+  } else if (visitor === '热搜君') {
+    ev.text = '热搜君私聊你："老板，买个热搜吗？¥2000 上圈内榜一。"';
+    ev.options = [
+      { label: '买', fn: function() { if (S.money < 2000) { log('钱不够。', 'bad'); return; } S.money -= 2000; S.opinion += 15; log('花 ¥2000 上热搜，舆论 +15。', 'good'); } },
+      { label: '不买', fn: function() { log('你没买热搜。'); } }
+    ];
+  } else if (visitor === 'T总') {
+    ev.text = 'T总私聊你："我想整合整个脚本圈，你有没有兴趣拿点股份？"';
+    ev.options = [
+      { label: '接受', fn: function() { S.money += 10000; S.equity -= 1; log('你拿了 T总的钱，+¥10000，股权 -1。', 'sys'); } },
+      { label: '拒绝', fn: function() { S.npc['T总'].hate += 10; log('你拒绝了 T总，敌意 +10。', 'bad'); } }
+    ];
+  }
+
+  document.getElementById('evTitle').textContent = ev.title;
+  document.getElementById('evText').textContent = ev.text;
+  var optEl = document.getElementById('evOptions');
+  optEl.innerHTML = '';
+  ev.options.forEach(function(o) {
+    var btn = document.createElement('button');
+    btn.className = 'primary';
+    btn.style.marginTop = '6px';
+    btn.textContent = o.label;
+    btn.addEventListener('click', function() {
+      o.fn();
+      document.getElementById('eventBox').classList.add('hidden');
+      render();
+    });
+    optEl.appendChild(btn);
+  });
+  document.getElementById('eventBox').classList.remove('hidden');
+}
+
+/* ============================================================
+   官方行动轮盘
+============================================================ */
+function officialWheel() {
+  var roll = rnd(5);
+  log('【官方行动轮盘】', 'sys');
+  if (roll === 1) { S.detect = clamp(S.detect + 10, 0, 100); log('→ 反作弊大更新，检测 +10。', 'sys'); }
+  else if (roll === 2) { S.detect = clamp(S.detect + 15, 0, 100); S.patience -= 15; log('→ 封号潮，检测 +15，耐心 -15。', 'bad'); }
+  else if (roll === 3) { S.evidence += 10; log('→ 钓鱼执法，证据链 +10。', 'sys'); }
+  else if (roll === 4) {
+    if (S.evidence >= 80) { showEnding('🚫 官方铁拳', '证据链 ≥80，官方发出律师函，你被端了。'); }
+    else log('→ 律师函警告，但证据不足。', 'sys');
+  }
+  else if (roll === 5) { S.evidence += 5; log('→ 策反内鬼，证据链 +5。', 'sys'); }
+}
+
+/* ============================================================
+   结局判定
+============================================================ */
+function checkEnding() {
+  if (!S || S.over) return;
+
+  if (S.money < -5000) { showEnding('📉 身败名裂', '债务缠身，你被挂到退网。'); return; }
+  if (S.opinion <= 0) { showEnding('📉 身败名裂', '舆论崩盘，你被全网封杀。'); return; }
+
+  if (S.identity === '制作者' && S.rep >= 90 && S.money >= 100000) {
+    showEnding('🏆 脚本圈教父', '顶级作者 + 代理网络，你成了圈内传说。');
+  }
+  if (S.identity === '鉴挂师' && S.evidence >= 90 && S.rep >= 80) {
+    showEnding('🏆 金牌鉴挂师', '实锤 3 个头部作者且未翻车，圈内封神。');
+  }
+  if (S.identity === '水军头子' && S.credibility <= 0) {
+    showEnding('🚫 全网封杀', '被扒出收钱反串，可信度归零，全网封杀。');
+  }
+  if (S.identity === '担保中间人' && S.deposit >= 200000) {
+    showEnding('💸 卷款之王', '押金池 ≥20 万后跑路，成为追债人目标。');
+  }
+  if (S.identity === '云供应商' && S.servers <= 0) {
+    showEnding('🚫 机房被封', '官方证据链 ≥80，服务器全灭。');
+  }
+  if (S.identity === '追债人' && S.money >= 200000 && S.rep >= 80) {
+    showEnding('🏆 圈内判官', '追回总额 ≥20 万，声望 ≥80，让 2 个跑路者退圈。');
+  }
+  if (S.identity === '金主' && S.money >= 500000 && S.opinion >= 60) {
+    showEnding('🏆 资本教父', '控股 3 个头部脚本/代理，余额 ≥50 万。');
+  }
+}
+
+function showEnding(title, body) {
+  S.over = true;
+  save();
+  document.getElementById('ovTitle').textContent = title;
+  document.getElementById('ovBody').textContent = body;
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+/* ============================================================
+   Tab 切换
+============================================================ */
+function switchTab(tab) {
+  var tabs = ['Act', 'Script', 'Npc', 'Info'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('tab' + t);
+    var panel = document.getElementById('panel' + t);
+    if (t.toLowerCase() === tab) {
+      btn.classList.add('active');
+      panel.classList.remove('hidden');
+    } else {
+      btn.classList.remove('active');
+      panel.classList.add('hidden');
+    }
+  });
+}
+
+/* ============================================================
+   启动
+============================================================ */
+function startGame(identity) {
+  S = newGame(identity);
+  document.getElementById('identityPicker').classList.add('hidden');
+  document.getElementById('log').innerHTML = '';
+  log('【开局】身份：' + identity, 'sys');
+  log('余额 ¥' + S.money + '，声望 ' + S.rep + '，舆论 ' + S.opinion + '，检测 ' + S.detect + '，耐心 ' + S.patience + '，AP ' + S.ap + '。', 'sys');
+  log('每天 3 AP，点行动按钮做事，点“进入夜晚”结算。', 'sys');
+  render();
+}
+
+function showIdentityPicker() {
+  var list = ['制作者','顾客','代理','官方','视频作者','群管理员','鉴挂师','水军头子','担保中间人','云供应商','追债人','金主'];
+  var container = document.getElementById('identityList');
+  container.innerHTML = '';
+  list.forEach(function(n, i) {
+    var btn = document.createElement('button');
+    btn.className = 'identity-btn';
+    btn.textContent = (i + 1) + '. ' + n;
+    btn.addEventListener('click', function() {
+      startGame(n);
+    });
+    container.appendChild(btn);
+  });
+  document.getElementById('identityPicker').classList.remove('hidden');
+}
+
+/* ============================================================
+   事件绑定
+============================================================ */
+window.onload = function() {
+  document.getElementById('tabAct').addEventListener('click', function() { switchTab('act'); });
+  document.getElementById('tabScript').addEventListener('click', function() { switchTab('script'); });
+  document.getElementById('tabNpc').addEventListener('click', function() { switchTab('npc'); });
+  document.getElementById('tabInfo').addEventListener('click', function() { switchTab('info'); });
+  document.getElementById('btnNext').addEventListener('click', function() { nextPhase(); npcVisit(); });
+  document.getElementById('btnRestart').addEventListener('click', function() {
+    if (confirm('重新开始？')) restart();
+  });
+  document.getElementById('btnEndRestart').addEventListener('click', function() { restart(); });
+  document.getElementById('btnCustomAct').addEventListener('click', doCustomAction);
+  document.getElementById('btnNewScript').addEventListener('click', createScript);
+
+  var saved = load();
+  if (saved && saved.identity) {
+    S = saved;
+    // 兼容旧存档
+    if (!S.scripts) S.scripts = [];
+    if (!S.faction) S.faction = '吃瓜派';
+    if (!S.season) S.season = 1;
+    if (!S.seasonDay) S.seasonDay = 0;
+    if (!S.transferDays) S.transferDays = 0;
+    log('【读档】已恢复上次进度。', 'sys');
+    render();
+  } else {
+    showIdentityPicker();
+  }
+};
+</script>
+</body>
+</html>
